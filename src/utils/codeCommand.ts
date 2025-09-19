@@ -79,9 +79,16 @@ export async function executeCodeCommand(args: string[] = []) {
     }
   );
 
-  // Close stdin for non-interactive mode
+  // Handle stdin piping for non-interactive mode
   if (config.NON_INTERACTIVE_MODE) {
-    claudeProcess.stdin?.end();
+    // Check if stdin is being piped to the process
+    if (!process.stdin.isTTY) {
+      // Pipe stdin to claude process when input is being piped
+      process.stdin.pipe(claudeProcess.stdin!);
+    } else {
+      // Close stdin only when not receiving piped input
+      claudeProcess.stdin?.end();
+    }
   }
 
   claudeProcess.on("error", (error) => {
