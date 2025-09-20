@@ -4,6 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useConfig } from "./ConfigProvider";
 import { Combobox } from "./ui/combobox";
+import { MultiSelectCombobox } from "./ui/multi-select-combobox";
 
 export function Router() {
   const { t } = useTranslation();
@@ -34,7 +35,7 @@ export function Router() {
     image: ""
   };
 
-  const handleRouterChange = (field: string, value: string | number) => {
+  const handleRouterChange = (field: string, value: string | string[] | number) => {
     // Handle case where config.Router might be null or undefined
     const currentRouter = config.Router || {};
     const newRouter = { ...currentRouter, [field]: value };
@@ -72,7 +73,7 @@ export function Router() {
       <CardContent className="flex-grow space-y-5 overflow-y-auto p-4">
         <div className="space-y-2">
           <Label>{t("router.default")}</Label>
-          <Combobox
+          <MultiSelectCombobox
             options={modelOptions}
             value={routerConfig.default || ""}
             onChange={(value) => handleRouterChange("default", value)}
@@ -83,7 +84,7 @@ export function Router() {
         </div>
         <div className="space-y-2">
           <Label>{t("router.background")}</Label>
-          <Combobox
+          <MultiSelectCombobox
             options={modelOptions}
             value={routerConfig.background || ""}
             onChange={(value) => handleRouterChange("background", value)}
@@ -94,7 +95,7 @@ export function Router() {
         </div>
         <div className="space-y-2">
           <Label>{t("router.think")}</Label>
-          <Combobox
+          <MultiSelectCombobox
             options={modelOptions}
             value={routerConfig.think || ""}
             onChange={(value) => handleRouterChange("think", value)}
@@ -107,7 +108,7 @@ export function Router() {
           <div className="flex items-center gap-4">
             <div className="flex-1">
               <Label>{t("router.longContext")}</Label>
-              <Combobox
+              <MultiSelectCombobox
                 options={modelOptions}
                 value={routerConfig.longContext || ""}
                 onChange={(value) => handleRouterChange("longContext", value)}
@@ -129,7 +130,7 @@ export function Router() {
         </div>
         <div className="space-y-2">
           <Label>{t("router.webSearch")}</Label>
-          <Combobox
+          <MultiSelectCombobox
             options={modelOptions}
             value={routerConfig.webSearch || ""}
             onChange={(value) => handleRouterChange("webSearch", value)}
@@ -142,7 +143,7 @@ export function Router() {
           <div className="flex items-center gap-4">
             <div className="flex-1">
               <Label>{t("router.image")} (beta)</Label>
-              <Combobox
+              <MultiSelectCombobox
                 options={modelOptions}
                 value={routerConfig.image || ""}
                 onChange={(value) => handleRouterChange("image", value)}
