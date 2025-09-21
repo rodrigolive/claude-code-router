@@ -6,8 +6,34 @@ import {
 import { get_encoding } from "tiktoken";
 import { sessionUsageCache, Usage } from "./cache";
 import { readFile } from 'fs/promises'
+import { failoverManager } from "./failover";
 
 const enc = get_encoding("cl100k_base");
+
+/**
+ * Get the appropriate model from router config, handling both strings and arrays
+ * @param routerConfig Router configuration value (string or string[])
+ * @param sessionId Session ID for failover tracking
+ * @returns Selected model string
+ */
+const getModelFromConfig = (routerConfig: string | string[] | undefined, sessionId?: string): string => {
+  if (!routerConfig) {
+    throw new Error('No router configuration provided');
+  }
+
+  if (typeof routerConfig === 'string') {
+    return routerConfig;
+  }
+
+  if (Array.isArray(routerConfig)) {
+    if (routerConfig.length === 0) {
+      throw new Error('Empty provider array');
+    }
+    return failoverManager.getNextProvider(routerConfig, sessionId);
+  }
+
+  throw new Error('Invalid router configuration type');
+};
 
 const calculateTokenCount = (
   messages: MessageParam[],
@@ -97,7 +123,7 @@ const getUseModel = async (
         req.log.info(
       `Using long context model due to token count: ${tokenCount}, threshold: ${longContextThreshold}`
     );
-    return config.Router.longContext;
+    return getModelFromConfig(config.Router.longContext, req.sessionId);
   }
   if (
     req.body?.system?.length > 1 &&
@@ -120,21 +146,21 @@ const getUseModel = async (
     config.Router.background
   ) {
     req.log.info(`Using background model for ${req.body.model}`);
-    return config.Router.background;
+    return getModelFromConfig(config.Router.background, req.sessionId);
   }
   // if exits thinking, use the think model
   if (req.body.thinking && config.Router.think) {
     req.log.info(`Using think model for ${req.body.thinking}`);
-    return config.Router.think;
+    return getModelFromConfig(config.Router.think, req.sessionId);
   }
   if (
     Array.isArray(req.body.tools) &&
     req.body.tools.some((tool: any) => tool.type?.startsWith("web_search")) &&
     config.Router.webSearch
   ) {
-    return config.Router.webSearch;
+    return getModelFromConfig(config.Router.webSearch, req.sessionId);
   }
-  return config.Router!.default;
+  return getModelFromConfig(config.Router!.default, req.sessionId);
 };
 
 export const router = async (req: any, _res: any, context: any) => {
@@ -176,9 +202,23 @@ export const router = async (req: any, _res: any, context: any) => {
       model = await getUseModel(req, tokenCount, config, lastMessageUsage);
     }
     req.body.model = model;
+    
+    // Store the selected model for potential failover
+    req.selectedModel = model;
   } catch (error: any) {
     req.log.error(`Error in router middleware: ${error.message}`);
-    req.body.model = config.Router!.default;
+    // Try to get a fallback model using failover
+    try {
+      req.body.model = getModelFromConfig(config.Router!.default, req.sessionId);
+    } catch (fallbackError: any) {
+      req.log.error(`Fallback model selection failed: ${fallbackError.message}`);
+      // Last resort - use the first available provider
+      if (Array.isArray(config.Router!.default) && config.Router!.default.length > 0) {
+        req.body.model = config.Router!.default[0];
+      } else {
+        req.body.model = config.Router!.default;
+      }
+    }
   }
   return;
 };

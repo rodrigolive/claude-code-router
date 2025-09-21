@@ -195,7 +195,28 @@ async function run(options: RunOptions = {}) {
     }
   });
   server.addHook("onError", async (request, reply, error) => {
+    // Handle failover for provider errors
+    if (request.url.startsWith("/v1/messages") && request.selectedModel) {
+      const { failoverManager } = await import('./utils/failover');
+      failoverManager.recordFailure(request.selectedModel, request.sessionId, error);
+      
+      // Log the error for debugging
+      request.log.error(`Provider error for ${request.selectedModel}:`, error.message || error);
+      
+      // If this is a retryable error, we could potentially retry with a different provider
+      // but since we're in the error hook, the request has already failed
+      // The failover will be handled on the next request
+    }
+    
     event.emit('onError', request, reply, error);
+  })
+  
+  server.addHook("onResponse", async (request, reply) => {
+    // Record successful requests for failover tracking
+    if (request.url.startsWith("/v1/messages") && request.selectedModel && reply.statusCode < 400) {
+      const { failoverManager } = await import('./utils/failover');
+      failoverManager.recordSuccess(request.selectedModel, request.sessionId);
+    }
   })
   server.addHook("onSend", (req, reply, payload, done) => {
     if (req.sessionId && req.url.startsWith("/v1/messages")) {
