@@ -78,6 +78,14 @@ const getUseModel = async (
         (m: any) => m.toLowerCase() === model
     );
     if (finalProvider && finalModel) {
+      // Handle bodyDelete option for the provider
+      if (finalProvider.bodyDelete && Array.isArray(finalProvider.bodyDelete)) {
+        finalProvider.bodyDelete.forEach((field: string) => {
+          if (req.body.hasOwnProperty(field)) {
+            delete req.body[field];
+          }
+        });
+      }
       return `${finalProvider.name},${finalModel}`;
     }
     return req.body.model;
