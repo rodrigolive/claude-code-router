@@ -181,7 +181,7 @@ export const router = async (req: any, _res: any, context: any) => {
     // Apply bodyDelete for the selected provider
     if (req.body.model.includes(",")) {
       const [providerName] = req.body.model.split(",");
-      const provider = config.Providers.find(
+      const provider = (config.Providers || config.providers)?.find(
         (p: any) => p.name.toLowerCase() === providerName.toLowerCase()
       );
 
