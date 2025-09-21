@@ -147,7 +147,8 @@ export const router = async (req: any, _res: any, context: any) => {
     }
   }
   const lastMessageUsage = sessionUsageCache.get(req.sessionId);
-  const { messages, system = [], tools }: MessageCreateParamsBase = req.body;
+  // Loosen typing here to support both string and array system prompts without TS friction
+  const { messages, system = [], tools } = req.body as any;
   if (config.REWRITE_SYSTEM_PROMPT && system.length > 1 && system[1]?.text?.includes('<env>')) {
     const prompt = await readFile(config.REWRITE_SYSTEM_PROMPT, 'utf-8');
     system[1].text = `${prompt}<env>${system[1].text.split('<env>').pop()}`
@@ -176,6 +177,40 @@ export const router = async (req: any, _res: any, context: any) => {
       model = await getUseModel(req, tokenCount, config, lastMessageUsage);
     }
     req.body.model = model;
+
+    // Apply bodyDelete for the selected provider
+    if (req.body.model.includes(",")) {
+      const [providerName] = req.body.model.split(",");
+      const provider = config.Providers.find(
+        (p: any) => p.name.toLowerCase() === providerName.toLowerCase()
+      );
+
+      if (provider && provider.bodyDelete && Array.isArray(provider.bodyDelete)) {
+        req.log.info(`Applying bodyDelete for provider ${providerName}: ${provider.bodyDelete.join(', ')}`);
+        provider.bodyDelete.forEach((field: string) => {
+          if (req.body.hasOwnProperty(field)) {
+            req.log.debug(`Removing field '${field}' from request body`);
+            delete req.body[field];
+          } else {
+            req.log.debug(`Field '${field}' not found in request body, skipping`);
+          }
+
+          // Special-case: if provider disallows 'reasoning', ensure we also
+          // remove 'thinking' and related flags to prevent downstream
+          // transformers from re-introducing a 'reasoning' payload.
+          if (field === 'reasoning') {
+            if (req.body.thinking) {
+              req.log.debug("Removing 'thinking' from request body due to provider 'reasoning' restriction");
+              delete req.body.thinking;
+            }
+            if (req.body.enable_thinking !== undefined) {
+              req.log.debug("Removing 'enable_thinking' from request body due to provider 'reasoning' restriction");
+              delete req.body.enable_thinking;
+            }
+          }
+        });
+      }
+    }
   } catch (error: any) {
     req.log.error(`Error in router middleware: ${error.message}`);
     req.body.model = config.Router!.default;
