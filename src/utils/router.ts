@@ -236,6 +236,15 @@ export const router = async (req: any, _res: any, context: any) => {
           }
         });
       }
+
+      // Apply bodySet for the selected provider
+      if (provider && provider.bodySet) {
+        req.log.info(`Applying bodySet for provider ${providerName}: ${JSON.stringify(provider.bodySet)}`);
+        Object.entries(provider.bodySet).forEach(([key, value]) => {
+          req.log.debug(`Setting field '${key}' to '${value}' in request body`);
+          req.body[key] = value;
+        });
+      }
     }
   } catch (error: any) {
     req.log.error(`Error in router middleware: ${error.message}`);
